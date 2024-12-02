@@ -1,0 +1,136 @@
+/* Basic styles */
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: #181818;
+  color: #050505;
+}
+
+/* Header styles */
+.header {
+  background-color: #212121;
+  color: #ffffff;
+  padding: 20px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: bold;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+/* Layout styles */
+.container {
+  display: flex;
+  flex-grow: 1;
+}
+
+/* Sidebar styles */
+.sidebar {
+  width: 250px;
+  height: 100vh;
+  background-color: #1f1f1f;
+  color: #cfcfcf;
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar a {
+  color: #cfcfcf;
+  text-decoration: none;
+  padding: 15px 20px;
+  margin: 10px 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.3s ease, transform 0.2s;
+}
+
+.sidebar a i {
+  font-size: 20px;
+  margin-right: 15px;
+}
+
+.sidebar a:hover {
+  background-color: #424242;
+  transform: translateX(5px);
+}
+
+/* Main content area styles */
+.main-content {
+  flex-grow: 1;
+  padding: 30px;
+  background-color: #1f1f1f;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  margin: 20px;
+  border-radius: 15px;
+  color: #e0e0e0;
+}
+
+/* Welcome message */
+.main-content h2 {
+  color: #fffefe;
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.main-content p {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #ffffff;
+}
+
+/* Button styles for graph icons */
+.sidebar a {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+/* Add subtle shadows to enhance modern look */
+.sidebar a:hover {
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .sidebar a {
+    font-size: 16px;
+    padding: 10px;
+    margin: 8px 10px;
+  }
+
+  .main-content {
+    margin: 10px;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 576px) {
+  .header {
+    font-size: 20px;
+    padding: 15px;
+  }
+
+  .sidebar {
+    width: 100px;
+  }
+
+  .sidebar a {
+    font-size: 14px;
+    padding: 8px;
+  }
+
+  .main-content {
+    padding: 15px;
+  }
+}

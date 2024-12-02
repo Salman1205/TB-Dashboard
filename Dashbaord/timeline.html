@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      TB Data Dashboard - Timeline Visualization with Advanced Features
+    </title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #424242;
+        margin: 0;
+        padding: 0;
+        color: #131313;
+      }
+
+      h2 {
+        text-align: center;
+        margin: 20px;
+        font-size: 24px;
+        color: #000000;
+      }
+
+      .viz-container {
+        width: 90%;
+        margin: 10px auto;
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+      }
+
+      .controls-container,
+      .filters-container {
+        margin: 10px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .controls-container button {
+        background-color: #007bff;
+        color: #111111;
+        border: none;
+        padding: 8px 12px;
+        font-size: 14px;
+        cursor: pointer;
+        border-radius: 5px;
+        margin-right: 10px;
+        transition: background-color 0.3s, transform 0.2s;
+      }
+
+      .controls-container button:hover {
+        background-color: #0056b3;
+        transform: scale(1.05);
+      }
+
+      .controls-container input[type="range"] {
+        margin-left: 10px;
+        vertical-align: middle;
+      }
+
+      .filters-container {
+        position: relative;
+        display: inline-block;
+        padding: 10px;
+        background-color: #ffffff;
+        border-radius: 5px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        width: 250px;
+      }
+
+      .filters-container .filter-label {
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      #filterDropdown {
+        position: absolute;
+        top: 50px;
+        left: 0;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 1;
+        display: none;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        width: 250px;
+      }
+
+      #filterDropdown label {
+        display: block;
+        cursor: pointer;
+        font-size: 14px;
+        margin-bottom: 5px;
+      }
+
+      .legend-container {
+        margin-top: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-right: 15px;
+        margin-bottom: 10px;
+        cursor: pointer;
+      }
+
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+        border-radius: 3px;
+        box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .viz-svg {
+        width: 60%;
+        height: 300px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .tooltip {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.8);
+        color: #ffffff;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="viz-container" style="color: black">
+      <div class="controls-container" style="color: black">
+        <button id="playButton">Play</button>
+        <button id="pauseButton">Pause</button>
+        <input
+          type="range"
+          id="dateRange"
+          min="2000"
+          max="2023"
+          step="1"
+          value="2000"
+        />
+        <label for="dateRange" style="color: black"
+          >Year: <span id="currentYear">2000</span></label
+        >
+      </div>
+      <div class="filters-container">
+        <div class="filter-label" style="color: black">
+          Filter by Country <i class="fas fa-caret-down"></i>
+        </div>
+        <div id="filterDropdown" style="color: black">
+          <label style="color: black"
+            ><input type="checkbox" value="all" id="selectAll" /> Select
+            All</label
+          >
+        </div>
+      </div>
+      <div class="legend-container" id="legend"></div>
+      <svg class="viz-svg" id="svgTimeline"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <script>
+      const svgTimeline = d3.select("#svgTimeline");
+      const timelineWidth = +svgTimeline.node().getBoundingClientRect().width;
+      const timelineHeight = 300;
+      svgTimeline.attr("height", timelineHeight);
+
+      const margin = { top: 20, right: 20, bottom: 50, left: 60 };
+      const innerWidth = timelineWidth - margin.left - margin.right;
+      const innerHeight = timelineHeight - margin.top - margin.bottom;
+
+      const g = svgTimeline
+        .append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+      const zoom = d3
+        .zoom()
+        .scaleExtent([1, 5])
+        .translateExtent([
+          [0, 0],
+          [innerWidth, innerHeight],
+        ])
+        .on("zoom", zoomed);
+
+      svgTimeline.call(zoom);
+
+      function zoomed(event) {
+        const transform = event.transform;
+        g.attr("transform", transform);
+        g.select(".x-axis").call(xAxis.scale(transform.rescaleX(xScale)));
+        g.select(".y-axis").call(yAxis.scale(transform.rescaleY(yScale)));
+      }
+
+      const xScale = d3
+        .scaleLinear()
+        .domain([2000, 2023])
+        .range([0, innerWidth]);
+
+      let yScale = d3.scaleLinear().range([innerHeight, 0]);
+
+      const xAxis = d3.axisBottom(xScale).tickFormat(d3.format("d")).ticks(12);
+
+      let yAxis = d3.axisLeft(yScale).tickFormat((d) => d3.format(",")(d));
+
+      g.append("g")
+        .attr("transform", `translate(0, ${innerHeight})`)
+        .attr("class", "x-axis");
+
+      g.append("g").attr("class", "y-axis");
+
+      const line = d3
+        .line()
+        .x((d) => xScale(d.year))
+        .y((d) => yScale(d.e_inc_100k))
+        .curve(d3.curveCardinal);
+
+      const tooltip = d3.select("#tooltip");
+
+      d3.json("preprocessed_data.json")
+        .then(function (tbData) {
+          tbData.forEach((d) => {
+            d.year = +d.year;
+            d.e_inc_100k = +d.e_inc_100k * 1000;
+          });
+
+          const countries = Array.from(new Set(tbData.map((d) => d.country)));
+          const filterDropdown = d3.select("#filterDropdown");
+
+          countries.forEach((country) => {
+            filterDropdown
+              .append("label")
+              .html(`<input type="checkbox" value="${country}"> ${country}`);
+          });
+
+          d3.select(".filter-label").on("click", function () {
+            const dropdown = document.getElementById("filterDropdown");
+            dropdown.style.display =
+              dropdown.style.display === "block" ? "none" : "block";
+          });
+
+          d3.select("#selectAll").on("change", function () {
+            const checked = this.checked;
+            d3.selectAll("#filterDropdown input[type='checkbox']").property(
+              "checked",
+              checked
+            );
+            updateChart(currentYear);
+          });
+
+          d3.selectAll("#filterDropdown input[type='checkbox']").on(
+            "change",
+            function () {
+              updateChart(currentYear);
+            }
+          );
+
+          const colorScale = d3
+            .scaleOrdinal(d3.schemeCategory10)
+            .domain(countries);
+
+          let currentYear = 2000;
+          let isPlaying = false;
+          let timer;
+
+          function updateChart(year) {
+            const selectedCheckboxes = d3
+              .selectAll("#filterDropdown input[type='checkbox']:checked")
+              .nodes()
+              .map((n) => n.value);
+            const selectedCountries = selectedCheckboxes.includes("all")
+              ? countries
+              : selectedCheckboxes;
+
+            const filteredData =
+              selectedCountries.length > 0
+                ? tbData.filter(
+                    (d) =>
+                      d.year <= year && selectedCountries.includes(d.country)
+                  )
+                : tbData.filter((d) => d.year <= year);
+
+            yScale.domain([
+              Math.max(1, d3.min(filteredData, (d) => d.e_inc_100k) * 0.95),
+              d3.max(filteredData, (d) => d.e_inc_100k) * 1.05,
+            ]);
+
+            g.select(".y-axis").call(yAxis);
+            g.select(".x-axis").call(xAxis);
+
+            const nestedData = d3.group(filteredData, (d) => d.country);
+
+            const lines = g
+              .selectAll(".line-country")
+              .data(Array.from(nestedData.entries()), (d) => d[0]);
+
+            lines
+              .enter()
+              .append("path")
+              .attr("class", "line-country")
+              .attr("fill", "none")
+              .attr("stroke", (d) => colorScale(d[0]))
+              .attr("stroke-width", 2.5)
+              .merge(lines)
+              .attr("d", (d) => line(d[1]))
+              .on("mousemove", function (event) {
+                const year = Math.round(
+                  xScale.invert(d3.pointer(event, this)[0])
+                );
+                const dataAtYear = filteredData.filter((d) => d.year === year);
+                const tooltipData = dataAtYear
+                  .map(
+                    (d) =>
+                      `<strong>${d.country}:</strong> ${d3.format(",")(
+                        d.e_inc_100k
+                      )}`
+                  )
+                  .join("<br>");
+                tooltip.transition().duration(200).style("opacity", 0.9);
+                tooltip
+                  .html(`<strong>Year:</strong> ${year}<br>${tooltipData}`)
+                  .style("left", event.pageX + 10 + "px")
+                  .style("top", event.pageY - 10 + "px");
+              })
+              .on("mouseout", function () {
+                tooltip.transition().duration(500).style("opacity", 0);
+              });
+
+            lines.exit().remove();
+
+            d3.select("#currentYear").text(year);
+
+            // Update legend
+            const legend = d3.select("#legend");
+            legend.selectAll("*").remove();
+            selectedCountries.forEach((country) => {
+              const legendItem = legend
+                .append("div")
+                .attr("class", "legend-item")
+                .on("click", function () {
+                  const line = g
+                    .selectAll(".line-country")
+                    .filter((d) => d[0] === country);
+                  const isActive = line.classed("inactive");
+                  line.classed("inactive", !isActive);
+                  line.attr("stroke-opacity", isActive ? 1 : 0.1);
+                });
+
+              legendItem
+                .append("div")
+                .attr("class", "legend-color")
+                .style("background-color", colorScale(country));
+
+              legendItem.append("span").text(country);
+            });
+          }
+
+          function playAnimation() {
+            if (!isPlaying) {
+              isPlaying = true;
+              timer = d3.interval(() => {
+                if (currentYear < 2023) {
+                  currentYear++;
+                  updateChart(currentYear);
+                  d3.select("#dateRange").property("value", currentYear);
+                } else {
+                  timer.stop();
+                  isPlaying = false;
+                }
+              }, 300);
+            }
+          }
+
+          function pauseAnimation() {
+            if (isPlaying) {
+              timer.stop();
+              isPlaying = false;
+            }
+          }
+
+          d3.select("#playButton").on("click", playAnimation);
+          d3.select("#pauseButton").on("click", pauseAnimation);
+          d3.select("#dateRange").on("input", function () {
+            currentYear = +this.value;
+            updateChart(currentYear);
+          });
+
+          updateChart(currentYear);
+        })
+        .catch(function (error) {
+          console.error("Error loading TB data:", error);
+        });
+    </script>
+  </body>
+</html>

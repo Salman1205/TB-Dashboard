@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Map Data Visualization</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+        background-color: #424242;
+      }
+
+      h1 {
+        margin: 20px 0;
+      }
+
+      #map {
+        position: relative;
+        width: 90%;
+        height: 75vh;
+        margin: auto;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      svg {
+        width: 100%;
+        height: 100%;
+        border-radius: 10px;
+      }
+
+      .zoom-buttons {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        gap: 10px;
+      }
+
+      .zoom-button {
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        font-size: 20px;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+
+      .zoom-button:hover {
+        background-color: rgba(0, 0, 0, 0.9);
+      }
+
+      .legend {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        width: 100px;
+      }
+
+      .legend-title {
+        margin-bottom: 5px;
+      }
+
+      .legend-gradient {
+        width: 100px;
+        height: 20px;
+        margin: 10px 0;
+      }
+
+      .tooltip {
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border: 1px solid #000000;
+        border-radius: 4px;
+        pointer-events: none;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        transform: translate(-50%, -100%);
+      }
+
+      .metric-toggle {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column; /* Stack buttons vertically */
+        gap: 10px;
+      }
+
+      .metric-button {
+        padding: 10px 20px;
+        margin: 0;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+      }
+
+      .metric-button.active {
+        background-color: rgba(0, 0, 0, 0.7);
+      }
+
+      .metric-button:hover {
+        background-color: rgba(34, 34, 34, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map">
+      <svg id="world-map"></svg>
+      <div class="zoom-buttons">
+        <button class="zoom-button" id="zoom-in">+</button>
+        <button class="zoom-button" id="zoom-out">-</button>
+      </div>
+      <div class="legend">
+        <div class="legend-title" id="legend-title">Incidence Rate</div>
+        <div class="legend-gradient" id="legend-gradient"></div>
+        <svg id="legend-scale" width="100" height="18"></svg>
+      </div>
+      <!-- Metric Toggle Buttons -->
+      <div class="metric-toggle">
+        <button class="metric-button" id="show-incidence">Incidence</button>
+        <button class="metric-button" id="show-mortality">Mortality</button>
+      </div>
+    </div>
+    <div class="tooltip" id="tooltip"></div>
+  </body>
+  <script>
+    const width = 1000;
+    const height = 600;
+
+    const svg = d3
+      .select("#world-map")
+      .attr("width", width)
+      .attr("height", height);
+
+    const tooltip = d3.select("#tooltip");
+
+    const projection = d3
+      .geoMercator()
+      .scale(150)
+      .translate([width / 2, height / 2]);
+
+    const path = d3.geoPath().projection(projection);
+
+    let currentZoomLevel = 1;
+
+    const zoom = d3
+      .zoom()
+      .scaleExtent([1, 8])
+      .on("zoom", (event) => {
+        svg.selectAll("path").attr("transform", event.transform);
+        currentZoomLevel = event.transform.k;
+      });
+
+    svg.call(zoom);
+
+    const dataMap = new Map();
+
+    const loadData = async () => {
+      const geojson = await d3.json("custom.geo.json");
+      const csvData = await d3.csv("data.csv");
+
+      csvData.forEach((row) => {
+        dataMap.set(row.iso3, {
+          e_inc_100k: +row.e_inc_100k,
+          e_mort_100k: +row.e_mort_100k,
+        });
+      });
+
+      const colorScale = d3
+        .scaleQuantize()
+        .domain([0, d3.max(csvData, (d) => d.e_inc_100k)])
+        .range(d3.schemeReds[9]);
+
+      const updateMap = (metric) => {
+        svg
+          .selectAll("path")
+          .data(geojson.features)
+          .join("path")
+          .attr("d", path)
+          .attr("fill", (d) => {
+            const value = dataMap.get(d.properties.iso_a3);
+            return value ? colorScale(value[metric]) : "#ccc";
+          })
+          .attr("stroke", "#333")
+          .on("mouseover", (event, d) => {
+            const value = dataMap.get(d.properties.iso_a3);
+            tooltip
+              .style("opacity", 1)
+              .html(
+                `<strong>${d.properties.admin}</strong><br>${
+                  metric === "e_inc_100k" ? "Incidence" : "Mortality"
+                }: ${value ? value[metric] : "No Data"}`
+              )
+              .style("left", `${event.pageX + 10}px`)
+              .style("top", `${event.pageY - 10}px`);
+          })
+          .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+          });
+
+        updateLegend(colorScale, metric);
+      };
+
+      const updateLegend = (colorScale, metric) => {
+        d3.select("#legend-gradient").style(
+          "background",
+          `linear-gradient(to right, ${colorScale.range().join(", ")})`
+        );
+
+        d3.select("#legend-title").text(
+          metric === "e_inc_100k" ? "Incidence Rate" : "Mortality Rate"
+        );
+      };
+
+      // Initial render
+      updateMap("e_inc_100k");
+
+      d3.select("#show-incidence").on("click", () => {
+        updateMap("e_inc_100k");
+      });
+
+      d3.select("#show-mortality").on("click", () => {
+        updateMap("e_mort_100k");
+      });
+
+      d3.select("#zoom-in").on("click", () => {
+        svg.transition().duration(500).call(zoom.scaleBy, 1.2);
+      });
+
+      d3.select("#zoom-out").on("click", () => {
+        svg.transition().duration(500).call(zoom.scaleBy, 0.8);
+      });
+    };
+
+    loadData();
+  </script>
+</html>

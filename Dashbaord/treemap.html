@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>D3 Treemap with Region, Country, and Year Legends</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #424242;
+        color: #020202;
+      }
+
+      h1 {
+        text-align: center;
+        color: #444;
+        margin-top: 20px;
+      }
+
+      #treemap {
+        position: relative;
+        width: 960px;
+        margin: 20px auto;
+      }
+
+      .breadcrumb a {
+        position: relative;
+        display: inline-block;
+        background: linear-gradient(90deg, #7fb3ff, #cfa9fc);
+        color: #ffffff;
+        text-decoration: none;
+        padding: 10px 20px;
+        margin-right: 5px;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+      }
+
+      .breadcrumb a:hover {
+        background: linear-gradient(90deg, #a9fcdf, #ff89c4);
+        color: #000000;
+      }
+
+      .tooltip {
+        position: absolute;
+        text-align: center;
+        padding: 6px;
+        background: black;
+        color: rgb(255, 253, 253);
+        border-radius: 4px;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .node {
+        border: 1px solid white;
+        font-size: 12px;
+        overflow: hidden;
+      }
+
+      /* Style for the color legend */
+      .legend {
+        font-size: 12px;
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .legend .item {
+        margin-right: 10px;
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .legend .item div {
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="treemap">
+      <div id="breadcrumb" class="breadcrumb"></div>
+      <div id="legend" class="legend"></div>
+    </div>
+
+    <script>
+      const treemapWidth = 980;
+      const treemapHeight = 650;
+
+      // Function to preprocess data into hierarchical format
+      function convertToHierarchicalFormat(data) {
+        const countryData = d3.rollup(
+          data,
+          (records) => d3.sum(records, (d) => d.e_mort_num || 0),
+          (d) => d.country
+        );
+
+        const topCountries = Array.from(countryData)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 50)
+          .map((d) => d[0]);
+
+        const filteredData = data.filter(
+          (d) =>
+            topCountries.includes(d.country) && d.year >= 2010 && d.year <= 2023
+        );
+
+        const hierarchy = {
+          name: "Global_TB_Mortality",
+          children: [],
+        };
+
+        const regionGroups = d3.group(filteredData, (d) => d.g_whoregion);
+        regionGroups.forEach((countries, region) => {
+          const regionNode = {
+            name: region,
+            children: [],
+          };
+
+          const countryGroups = d3.group(countries, (d) => d.country);
+          countryGroups.forEach((records, country) => {
+            const yearNodes = records.map((record) => ({
+              name: record.year.toString(),
+              e_mort_num: record.e_mort_num,
+              e_mort_100k: record.e_mort_100k,
+            }));
+
+            regionNode.children.push({
+              name: country,
+              children: yearNodes,
+            });
+          });
+
+          hierarchy.children.push(regionNode);
+        });
+
+        return hierarchy;
+      }
+
+      const tooltip = d3.select("body").append("div").attr("class", "tooltip");
+      d3.json("preprocessed_data.json").then((treeData) => {
+        const hierarchicalData = convertToHierarchicalFormat(treeData);
+        const tree_root = d3
+          .hierarchy(hierarchicalData)
+          .sum((d) => d.e_mort_num || 0)
+          .sort((a, b) => b.value - a.value);
+        const treemap = d3
+          .treemap()
+          .size([treemapWidth, treemapHeight])
+          .padding(2)(tree_root);
+
+        const regionColorScale = d3.scaleOrdinal(d3.schemeSet2);
+        const countryBaseColorScale = d3.scaleOrdinal(d3.schemeTableau10);
+
+        const svg = d3
+          .select("#treemap")
+          .append("svg")
+          .attr("width", treemapWidth)
+          .attr("height", treemapHeight);
+
+        function renderTreemap(node) {
+          svg.selectAll("*").remove();
+          const nodes = svg
+            .selectAll("g")
+            .data(node.children || [node])
+            .enter()
+            .append("g")
+            .attr("transform", (d) => `translate(${d.x0}, ${d.y0})`);
+
+          nodes
+            .append("rect")
+            .attr("class", "block")
+            .attr("width", (d) => d.x1 - d.x0)
+            .attr("height", (d) => d.y1 - d.y0)
+            .attr("fill", (d) => {
+              if (d.depth === 1) {
+                // Region level
+                return regionColorScale(d.data.name); // Assign region color
+              } else if (d.depth === 2) {
+                // Country level
+                return countryBaseColorScale(d.data.name);
+              } else if (d.depth === 3) {
+                // Year level
+                const countryMortalityValues = d.parent.children.map(
+                  (c) => c.data.e_mort_num || 0
+                );
+                const intensityScale = d3
+                  .scaleLinear()
+                  .domain([
+                    Math.min(...countryMortalityValues),
+                    Math.max(...countryMortalityValues),
+                  ])
+                  .range([
+                    countryBaseColorScale(d.parent.data.name),
+                    d3
+                      .color(countryBaseColorScale(d.parent.data.name))
+                      .darker(2),
+                  ]);
+
+                return intensityScale(d.data.e_mort_num || 0);
+              }
+              return "#ccc";
+            })
+            .on("mouseover", (event, d) => {
+              tooltip.style("opacity", 1).html(`Region: ${
+                d.parent?.parent?.data?.name || "Global"
+              }<br>
+                                   Country: ${
+                                     d.parent?.data?.name || "Unknown"
+                                   }<br>
+                                   Year: ${d.data.name || "Unknown"}<br>
+                                   TB Mortality: ${d.data.e_mort_num || 0}<br>
+                                   Rate per 100k: ${d.data.e_mort_100k || 0}`);
+            })
+            .on("mousemove", (event) => {
+              tooltip
+                .style("left", event.pageX + 10 + "px")
+                .style("top", event.pageY + 10 + "px");
+            })
+            .on("mouseout", () => {
+              tooltip.style("opacity", 0);
+            })
+            .on("click", (event, d) => {
+              if (d.children) {
+                updateBreadcrumb(d);
+                renderTreemap(d);
+                renderColorLegend(d);
+              }
+            });
+
+          nodes
+            .append("text")
+            .attr("x", 5)
+            .attr("y", 20)
+            .text((d) => d.data.name)
+            .attr("font-size", "12px")
+            .attr("fill", "white");
+        }
+
+        const breadcrumb = d3.select("#breadcrumb");
+
+        function updateBreadcrumb(node) {
+          const sequence = node
+            .ancestors()
+            .reverse()
+            .map((d) => d.data.name);
+          breadcrumb.html(
+            sequence.map((d, i) => `<a data-index="${i}">${d}</a>`).join(" > ")
+          );
+          breadcrumb.selectAll("a").on("click", (event, d) => {
+            const targetNode = node.ancestors().reverse()[
+              event.target.dataset.index
+            ];
+            renderTreemap(targetNode);
+            updateBreadcrumb(targetNode);
+            renderColorLegend(targetNode);
+          });
+        }
+
+        // Region, Country, and Year color legend
+        function renderColorLegend(node) {
+          const legendContainer = d3.select("#legend");
+          legendContainer.html(""); // Clear existing legend
+
+          if (node.depth === 0) {
+            // Region-level legend
+            const legendItems = regionColorScale.domain();
+            legendItems.forEach((region) => {
+              const legendItem = legendContainer
+                .append("div")
+                .attr("class", "item");
+              legendItem
+                .append("div")
+                .style("background-color", regionColorScale(region));
+              legendItem.append("span").text(region);
+            });
+          } else if (node.depth === 1) {
+            // Country-level legend
+            const legendItems = node.children.map((c) => c.data.name);
+            legendItems.forEach((country) => {
+              const legendItem = legendContainer
+                .append("div")
+                .attr("class", "item");
+              legendItem
+                .append("div")
+                .style("background-color", countryBaseColorScale(country));
+              legendItem.append("span").text(country);
+            });
+          } else if (node.depth === 2) {
+            // Year-level legend based on mortality value intensity
+            const yearMortalityValues = node.children.map(
+              (c) => c.data.e_mort_num || 0
+            );
+            const yearIntensityScale = d3
+              .scaleLinear()
+              .domain([
+                Math.min(...yearMortalityValues),
+                Math.max(...yearMortalityValues),
+              ])
+              .range([d3.rgb("#f0f0f0"), d3.rgb("#ff0000")]);
+
+            // Generate a gradient color box for intensity
+            const legendItem = legendContainer
+              .append("div")
+              .attr("class", "item");
+            const gradient = legendItem
+              .append("div")
+              .style("width", "100px")
+              .style("height", "20px")
+              .style(
+                "background",
+                `linear-gradient(to right, ${yearIntensityScale(
+                  0
+                )}, ${yearIntensityScale(1)})`
+              );
+
+            legendItem.append("span").text("Mortality Intensity (Year)");
+          }
+        }
+
+        renderTreemap(tree_root);
+        updateBreadcrumb(tree_root);
+        renderColorLegend(tree_root);
+      });
+    </script>
+  </body>
+</html>
