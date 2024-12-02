@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    />
+    <link rel="stylesheet" href="main.css" />
+    <script src="main.js" defer></script>
+  </head>
+  <body>
+    <!-- Header -->
+    <div class="header">
+      &#129507; Interactive Tuberculosis Dashboard &#128657;
+    </div>
+
+    <!-- Main container -->
+    <div class="container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <a href="#" onclick="loadPage('timeline.html')">
+          <i class="fas fa-stream"></i> Timeline
+        </a>
+        <a href="#" onclick="loadPage('map.html')">
+          <i class="fas fa-map-marked-alt"></i> Map
+        </a>
+        <a href="#" onclick="loadPage('force.html')">
+          <i class="fas fa-project-diagram"></i> Force Directed
+        </a>
+        <a href="#" onclick="loadPage('treemap.html')">
+          <i class="fas fa-th"></i> TreeMap
+        </a>
+        <a href="#" onclick="loadPage('sunburst.html')">
+          <i class="fas fa-sun"></i> Sunburst
+        </a>
+      </div>
+
+      <!-- Main content area -->
+      <div class="main-content" id="main-content" style="color: white">
+        <h2 style="text-decoration: underline;">Welcome to the Interactive Dashboard</h2>
+        <p style="font-size: 1.2em; line-height: 1.5;"></p>
+          Dive into a world of interactive visualizations by selecting an option from the sidebar. Each graph is crafted to provide deep insights with a sleek and engaging interface.
+        </p>
+        <ul style="list-style-type: none; padding: 0;">
+            <li style="margin: 10px 0;"><strong>Map:</strong> Geographical data representation.</li>
+
+          <li style="margin: 10px 0;"><strong>Force Directed:</strong> Network relationships.</li>
+
+           <li style="margin: 10px 0;"><strong>TreeMap:</strong> Hierarchical data visualization.</li>
+
+            <li style="margin: 10px 0;"><strong>Sunburst:</strong> Radial hierarchical data.</li>
+            <li><strong>Map:</strong> Geographical data representation.</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>
