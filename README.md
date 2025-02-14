@@ -14,7 +14,6 @@ The project is organized as follows:
 ├── /js                 # Folder for JavaScript files
 │   └── app.js          # Main JavaScript file
 ├── /data               # Folder for data files (e.g., JSON or CSV files)
-└── /assets             # (Optional) Folder for images or other assets
 ```
 
 ## Tech Stack
